@@ -1,0 +1,517 @@
+<script>
+  // ==========================================
+  // 1. CONFIGURATION & VARIABLES
+  // ==========================================
+  let currentUser = {};
+  let currentConfig = {};
+  let currentTableData = []; 
+  let currentRowIndex = null; 
+  let currentMenu = null;
+  let isSidebarCollapsed = false;
+  let operationMode = ''; 
+  
+  // Cache System
+  let DATA_CACHE = {}; 
+
+  // --- COLUMN CONFIGURATION ---
+  const COLUMN_CONFIG = {
+    'SchoolInfo': [
+      { key: 'school_id', label: 'รหัสโรงเรียน', readonly: true },
+      { key: 'school_name', label: 'ชื่อโรงเรียน' },
+      { key: 'province', label: 'จังหวัด' },
+      { key: 'district', label: 'อำเภอ' },
+      { key: 'affiliation', label: 'สังกัด' },
+      { key: 'director_name', label: 'ชื่อ ผอ.' },
+      { key: 'director_phone', label: 'เบอร์ ผอ.' },
+      { key: 'coord_name', label: 'ผู้ประสานงาน' },
+      { key: 'coord_phone', label: 'เบอร์ติดต่อ' }
+    ],
+    'FieldDetails': [
+      { key: 'school_id', label: 'รหัส', readonly: true },
+      { key: 'school_name', label: 'โรงเรียน', readonly: true },
+      { key: 'total_eligible', label: 'ผู้มีสิทธิ์สอบทั้งหมด' },
+      { key: 'total_rooms', label: 'จำนวนห้องสอบทั้งหมด' },
+      { key: 'round1_seats', label: 'ที่นั่งสอบรอบ 1' },
+      { key: 'round1_rooms', label: 'ห้องสอบรอบ 1' },
+      { key: 'round2_seats', label: 'ที่นั่งสอบรอบ 2' },
+      { key: 'round2_rooms', label: 'ห้องสอบรอบ 2' },
+      { key: 'round3_seats', label: 'ที่นั่งสอบรอบ 3' },
+      { key: 'round3_rooms', label: 'ห้องสอบรอบ 3' },
+      { key: 'round4_seats', label: 'ที่นั่งสอบรอบ 4' },
+      { key: 'round4_rooms', label: 'ห้องสอบรอบ 4' }
+    ],
+    'RoomDetails': [
+      { key: 'school_id', label: 'รหัส', readonly: true },
+      { key: 'school_name', label: 'โรงเรียน', readonly: true },
+      { key: 'room_seq', label: 'ลำดับห้อง' },
+      { key: 'room_name', label: 'ชื่อห้อง' },
+      { key: 'max_seats', label: 'จำนวนที่นั่งสูงสุด' },
+      { key: 'round1_seats', label: 'ที่นั่งรอบ 1' },
+      { key: 'round2_seats', label: 'ที่นั่งรอบ 2' },
+      { key: 'round3_seats', label: 'ที่นั่งรอบ 3' },
+      { key: 'round4_seats', label: 'ที่นั่งรอบ 4' }
+    ],
+    'BudgetDetails': [
+      { key: 'school_id', label: 'รหัส', readonly: true },
+      { key: 'school_name', label: 'โรงเรียน', readonly: true },
+      { key: 'head_exam_pay', label: 'ค่าตอบแทนหัวหน้าสนาม' },
+      { key: 'coord_pay', label: 'ค่าตอบแทนผู้ประสานงาน' },
+      { key: 'system_admin_pay', label: 'ค่าตอบแทน จนท.ระบบ' },
+      { key: 'system_room_pay', label: 'ค่าตอบแทน จนท.ห้องสอบ' },
+      { key: 'proctor_pay', label: 'ค่าตอบแทนกรรมการคุมสอบ' },
+      { key: 'janitor_pay', label: 'ค่าตอบแทนนักการภารโรง' },
+      { key: 'meeting_head', label: 'ค่าเบี้ยประชุมหัวหน้า' },
+      { key: 'meeting_coord', label: 'ค่าเบี้ยประชุมผู้ประสานงาน' },
+      { key: 'meeting_system_admin', label: 'ค่าเบี้ยประชุม จนท.ระบบ' },
+      { key: 'meeting_system_room', label: 'ค่าเบี้ยประชุม จนท.ห้องสอบ' },
+      { key: 'meeting_proctor', label: 'ค่าเบี้ยประชุมกรรมการ' },
+      { key: 'meeting_janitor', label: 'ค่าเบี้ยประชุมนักการ' },
+      { key: 'document_cost', label: 'ค่าพิมพ์เอกสาร' },
+      { key: 'facility_cost', label: 'ค่าใช้สถานที่' },
+      { key: 'total_budget', label: 'รวมเงินงบประมาณ' }
+    ],
+    'Users': [
+      { key: 'ref_id', label: 'รหัส (Ref ID)', readonly: true }, 
+      { key: 'display_name', label: 'ชื่อ/โรงเรียน' },
+      { key: 'username', label: 'Username' },
+      { key: 'password', label: 'Password' },
+      { key: 'role', label: 'สิทธิ์ (Dropdown)' },
+      { key: 'status', label: 'สถานะ (Active/Inactive)' }
+    ],
+    'Documents': [
+      { key: 'doc_id', label: 'รหัสเอกสาร' },
+      { key: 'doc_name', label: 'ชื่อเอกสาร' },
+      { key: 'category', label: 'หมวดหมู่' },
+      { key: 'link_url', label: 'ลิงก์ไฟล์ URL' },
+      { key: 'target_role', label: 'สิทธิ์การเห็น' }
+    ],
+    'Setting': [
+      { key: 'setting_key', label: 'ชื่อการตั้งค่า (Key)', readonly: true },
+      { key: 'setting_value', label: 'ค่าที่กำหนด (Value)' },
+      { key: 'description', label: 'คำอธิบาย' }
+    ]
+  };
+
+  // --- MENU CONFIGURATION ---
+  const MENUS = [
+    { id: 'home', label: 'ข้อมูลทั่วไป', icon: 'fa-school', table: 'SchoolInfo', viewType: 'table' },
+    { id: 'field', label: 'รายละเอียดสนามสอบ', icon: 'fa-building', table: 'FieldDetails', viewType: 'table' },
+    { id: 'room', label: 'รายละเอียดห้องสอบ', icon: 'fa-desktop', table: 'RoomDetails', viewType: 'table' },
+    { id: 'budget', label: 'รายละเอียดค่าใช้จ่าย', icon: 'fa-money-bill-wave', table: 'BudgetDetails', viewType: 'table' },
+    { id: 'docs', label: 'เอกสาร/คู่มือ', icon: 'fa-file-pdf', table: 'Documents', viewType: 'table' },
+  ];
+  
+  const ADMIN_MENUS = [
+     { id: 'users', label: 'จัดการผู้ใช้', icon: 'fa-users-cog', table: 'Users', viewType: 'table' },
+     { id: 'setting', label: 'ตั้งค่าระบบ', icon: 'fa-cogs', table: 'Setting', viewType: 'card' }
+  ];
+
+  // ==========================================
+  // 2. CORE LOGIC
+  // ==========================================
+  function handleLogin(e) {
+    e.preventDefault();
+    toggleLoader(true);
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    google.script.run.withSuccessHandler(res => {
+      toggleLoader(false);
+      if (res.status === true) {
+        currentUser = res.user;
+        currentConfig = res.config;
+        initDashboard();
+      } else {
+        Swal.fire({ icon: 'error', title: 'Login Failed', text: res.msg });
+      }
+    }).apiLogin(u, p);
+  }
+
+  function logout() {
+    Swal.fire({ title: 'ยืนยันออกจากระบบ?', icon: 'question', showCancelButton: true }).then((r) => {
+      if (r.isConfirmed) {
+        document.getElementById('page-dashboard').classList.add('hidden');
+        document.getElementById('page-login').classList.remove('hidden');
+        document.getElementById('password').value = '';
+        DATA_CACHE = {}; 
+      }
+    });
+  }
+
+  function initDashboard() {
+    document.getElementById('page-login').classList.add('hidden');
+    document.getElementById('page-dashboard').classList.remove('hidden');
+    document.getElementById('user-name').innerText = currentUser.display_name;
+    document.getElementById('user-role').innerText = currentUser.role.toUpperCase();
+    if (currentConfig.logo) document.querySelectorAll('#nav-logo').forEach(el => { el.src = currentConfig.logo; el.classList.remove('hidden'); });
+    
+    renderMenu();
+
+    let targetMenu = [...MENUS, ...ADMIN_MENUS].find(m => m.id === INITIAL_PAGE);
+    if (currentUser.role !== 'admin' && ADMIN_MENUS.some(m => m.id === INITIAL_PAGE)) targetMenu = MENUS[0];
+    
+    if (targetMenu) loadContent(targetMenu);
+    else loadContent(MENUS[0]);
+  }
+
+  function renderMenu() {
+    const list = document.getElementById('menu-list');
+    list.innerHTML = '';
+    let items = [...MENUS];
+    if (currentUser.role === 'admin') items = [...items, ...ADMIN_MENUS];
+    
+    let baseUrl = SCRIPT_URL;
+    if (!baseUrl || baseUrl === '#' || window.location.href.includes('googleusercontent')) {
+        baseUrl = window.location.href.split('?')[0]; 
+    }
+
+    items.forEach(item => {
+      const li = document.createElement('li');
+      const linkUrl = `${baseUrl}?page=${item.id}`;
+      li.innerHTML = `
+        <a href="${linkUrl}" class="sidebar-link flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg transition duration-200" title="${item.label}">
+           <div class="w-8 text-center flex-shrink-0"><i class="fas ${item.icon} text-lg"></i></div>
+           <span class="ml-3 font-medium sidebar-text overflow-hidden whitespace-nowrap">${item.label}</span>
+        </a>`;
+      const link = li.querySelector('a');
+      link.addEventListener('click', (e) => { 
+         if (e.button === 0 && !e.ctrlKey && !e.metaKey) { e.preventDefault(); loadContent(item); }
+      });
+      list.appendChild(li);
+    });
+  }
+
+  function toggleSidebar() {
+    isSidebarCollapsed = !isSidebarCollapsed;
+    const sidebar = document.getElementById('sidebar');
+    if (isSidebarCollapsed) { sidebar.classList.remove('w-64'); sidebar.classList.add('w-20', 'hide-text'); }
+    else { sidebar.classList.remove('w-20', 'hide-text'); sidebar.classList.add('w-64'); }
+    setTimeout(() => { if($.fn.DataTable.isDataTable('#dataTableID')) $('#dataTableID').DataTable().columns.adjust().responsive.recalc(); }, 300);
+  }
+
+  // ==========================================
+  // 3. CONTENT LOADING (SMART CACHING)
+  // ==========================================
+  function loadContent(menuItem, forceRefresh = false) {
+    currentMenu = menuItem;
+    document.getElementById('page-title').innerText = menuItem.label;
+    
+    document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('bg-blue-100', 'text-blue-700', 'font-bold'));
+    const activeLink = Array.from(document.querySelectorAll('.sidebar-link')).find(el => el.href.includes(`page=${menuItem.id}`));
+    if(activeLink) activeLink.classList.add('bg-blue-100', 'text-blue-700', 'font-bold');
+
+    document.getElementById('content-area').classList.add('hidden');
+    document.getElementById('card-area').classList.add('hidden');
+    
+    const btnAdd = document.getElementById('btn-add-data');
+    if (currentUser.role === 'admin' && ['Documents', 'Users', 'Setting'].includes(menuItem.table)) {
+       btnAdd.classList.remove('hidden'); btnAdd.classList.add('flex');
+    } else {
+       btnAdd.classList.add('hidden'); btnAdd.classList.remove('flex');
+    }
+
+    if (!forceRefresh && DATA_CACHE[menuItem.table]) {
+        processAndRender(DATA_CACHE[menuItem.table], menuItem);
+        return; 
+    }
+
+    toggleLoader(true);
+    google.script.run.withSuccessHandler(rawData => {
+      toggleLoader(false);
+      
+      let filteredData = rawData.filter(row => {
+          const firstDataKey = Object.keys(row).find(k => k !== '_rowIndex');
+          const val = row[firstDataKey];
+          return val && String(val).trim() !== '';
+      });
+      
+      DATA_CACHE[menuItem.table] = filteredData;
+      processAndRender(filteredData, menuItem);
+
+    }).apiGetData(menuItem.table, currentUser.role, currentUser.ref_id);
+  }
+
+  function processAndRender(data, menuItem) {
+      currentTableData = data; 
+
+      if (currentUser.role === 'school' && menuItem.id === 'home') {
+          document.getElementById('content-area').classList.remove('hidden');
+          renderSchoolProfile(data[0]); 
+      } 
+      else if (currentUser.role === 'school' && menuItem.id === 'field') {
+          document.getElementById('content-area').classList.remove('hidden');
+          renderFieldDetails(data[0]);
+      }
+      else if (currentUser.role === 'school' && menuItem.id === 'room') {
+          document.getElementById('content-area').classList.remove('hidden');
+          renderRoomDetails(data); // <-- ฟังก์ชันใหม่
+      }
+      else if (menuItem.viewType === 'table') {
+        document.getElementById('content-area').classList.remove('hidden');
+        renderTable(menuItem, data);
+      } else {
+        document.getElementById('card-area').classList.remove('hidden');
+        renderCards(menuItem, data);
+      }
+  }
+
+  // --- RENDER 1: SCHOOL PROFILE ---
+  function renderSchoolProfile(data) {
+    const div = document.getElementById('content-area');
+    if (!data) { div.innerHTML = `<div class="text-center py-10 text-gray-400">ไม่พบข้อมูล</div>`; return; }
+    const profileFields = [{ key: 'school_id', label: 'รหัสผู้ใช้' }, { key: 'school_name', label: 'ชื่อผู้ใช้' }, { key: 'director_name', label: 'หัวหน้าสนามสอบ' }, { key: 'director_phone', label: 'เบอร์โทรติดต่อหัวหน้าสนามสอบ' }, { key: 'coord_name', label: 'ผู้ประสานงาน' }, { key: 'coord_phone', label: 'เบอร์โทรติดต่อผู้ประสานงาน' }];
+    let html = `<div class="max-w-4xl mx-auto bg-white rounded-xl overflow-hidden shadow-lg border border-gray-200 mt-6"><div class="bg-blue-600 px-6 py-4 flex justify-between items-center"><h3 class="text-white text-lg font-bold flex items-center"><i class="fas fa-university mr-3"></i> ข้อมูลทั่วไปสถานศึกษา</h3><button onclick="editItem(${data._rowIndex})" class="text-white bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm transition shadow-sm border border-blue-500"><i class="fas fa-edit mr-1"></i> แก้ไขข้อมูล</button></div><div class="p-6"><table class="w-full border-collapse"><tbody>`;
+    profileFields.forEach((field, index) => { const val = data[field.key] || '-'; const bgClass = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'; html += `<tr class="border-b border-gray-100 hover:bg-blue-50 transition ${bgClass}"><td class="px-6 py-4 w-1/3 text-gray-600 font-semibold text-sm border-r border-gray-100">${field.label}</td><td class="px-6 py-4 text-gray-800 font-medium text-sm">${val}</td></tr>`; });
+    html += `</tbody></table></div></div>`;
+    div.innerHTML = html;
+  }
+
+  // --- RENDER 2: FIELD DETAILS ---
+  function renderFieldDetails(data) {
+    const div = document.getElementById('content-area');
+    if (!data) { div.innerHTML = `<div class="text-center py-10 text-gray-400">ไม่พบข้อมูลสนามสอบ</div>`; return; }
+    const roundsDetail = `${data.total_round || 0} รอบ (${data.detail_round || '-'})`;
+    const roomsDetail = `${data.total_rooms || 0} ห้อง <span class="text-xs text-gray-500 ml-2">(รอบ1: ${data.round1_rooms || 0}, รอบ2: ${data.round2_rooms || 0}, รอบ3: ${data.round3_rooms || 0}, รอบ4: ${data.round4_rooms || 0})</span>`;
+    let html = `<div class="max-w-5xl mx-auto space-y-6 mt-4"><div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden"><div class="bg-indigo-600 px-6 py-3 border-b border-indigo-700"><h3 class="text-white font-bold text-lg"><i class="fas fa-building mr-2"></i> ข้อมูลสนามสอบ</h3></div><div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6"><div class="bg-indigo-50 p-4 rounded-lg"><p class="text-sm text-gray-500 mb-1">จำนวนรอบการสอบ</p><p class="text-xl font-bold text-indigo-900">${roundsDetail}</p></div><div class="bg-blue-50 p-4 rounded-lg"><p class="text-sm text-gray-500 mb-1">จำนวนห้องสอบ</p><p class="text-xl font-bold text-blue-900">${roomsDetail}</p></div><div class="bg-green-50 p-4 rounded-lg"><p class="text-sm text-gray-500 mb-1">จำนวนผู้มีสิทธิ์สอบ</p><p class="text-xl font-bold text-green-900">${data.total_eligible || 0} คน</p></div><div class="bg-orange-50 p-4 rounded-lg"><p class="text-sm text-gray-500 mb-1">โรงเรียนที่เข้ารับการทดสอบ</p><p class="text-md font-bold text-orange-900">${data.school_test || '-'}</p></div></div></div><div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden"><div class="bg-teal-600 px-6 py-3 border-b border-teal-700"><h3 class="text-white font-bold text-lg"><i class="fas fa-users mr-2"></i> โครงสร้างคณะกรรมการ</h3></div><div class="p-0"><table class="w-full text-sm text-left text-gray-600"><thead class="text-xs text-gray-700 uppercase bg-gray-100"><tr><th class="px-6 py-3">ตำแหน่ง</th><th class="px-6 py-3 text-right">จำนวน (คน)</th></tr></thead><tbody class="divide-y divide-gray-100"><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">หัวหน้าสนามสอบ</td><td class="px-6 py-3 text-right">${data.head || 0}</td></tr><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">ผู้ประสานงานสนามสอบ</td><td class="px-6 py-3 text-right">${data.coord || 0}</td></tr><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">เจ้าหน้าที่ระบบสนามสอบ</td><td class="px-6 py-3 text-right">${data.system_admin || 0}</td></tr><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">เจ้าหน้าที่ระบบห้องสอบ</td><td class="px-6 py-3 text-right">${data.system_roomy || 0}</td></tr><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">กรรมการคุมสอบ</td><td class="px-6 py-3 text-right">${data.proctor || 0}</td></tr><tr class="hover:bg-gray-50"><td class="px-6 py-3 font-medium">นักการภารโรง</td><td class="px-6 py-3 text-right">${data.janitor || 0}</td></tr><tr class="bg-teal-50 font-bold text-teal-800"><td class="px-6 py-3">รวมคณะกรรมการทั้งหมด</td><td class="px-6 py-3 text-right">${data.total_comme || 0}</td></tr></tbody></table></div></div><div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden"><div class="px-6 py-4 flex items-start"><div class="p-3 bg-yellow-100 text-yellow-600 rounded-full mr-4"><i class="fas fa-school"></i></div><div><h4 class="text-gray-900 font-bold text-md">โรงเรียนที่ปฏิบัติหน้าที่กรรมการคุมสอบ</h4><p class="text-gray-600 mt-1">${data.proctor_name || '-'}</p></div></div></div></div>`;
+    div.innerHTML = html;
+  }
+
+  // --- RENDER 3: ROOM DETAILS (OFFICIAL TABLE) ---
+  function renderRoomDetails(data) {
+    const div = document.getElementById('content-area');
+    if (!data || data.length === 0) { div.innerHTML = `<div class="text-center py-10 text-gray-400">ไม่พบข้อมูลห้องสอบ</div>`; return; }
+
+    // Init Grand Totals
+    let totalR1 = 0, totalR2 = 0, totalR3 = 0, totalR4 = 0;
+    
+    // Generate Rows
+    let rowsHtml = '';
+    data.forEach((row, index) => {
+        // Parse numbers safely
+        const r1 = parseInt(row.round1_seats) || 0;
+        const r2 = parseInt(row.round2_seats) || 0;
+        const r3 = parseInt(row.round3_seats) || 0;
+        const r4 = parseInt(row.round4_seats) || 0;
+        const rowTotal = r1 + r2 + r3 + r4;
+
+        // Accumulate totals
+        totalR1 += r1; totalR2 += r2; totalR3 += r3; totalR4 += r4;
+
+        const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+        rowsHtml += `
+            <tr class="${bgClass} border-b border-gray-200 hover:bg-purple-50 transition text-gray-700">
+                <td class="px-6 py-4 font-bold text-center border-r border-gray-200">${row.room_seq}</td>
+                <td class="px-6 py-4 text-center border-r border-gray-100">${r1 > 0 ? r1 : '-'}</td>
+                <td class="px-6 py-4 text-center border-r border-gray-100">${r2 > 0 ? r2 : '-'}</td>
+                <td class="px-6 py-4 text-center border-r border-gray-100">${r3 > 0 ? r3 : '-'}</td>
+                <td class="px-6 py-4 text-center border-r border-gray-100">${r4 > 0 ? r4 : '-'}</td>
+                <td class="px-6 py-4 font-bold text-center text-purple-700 bg-purple-50">${rowTotal}</td>
+            </tr>`;
+    });
+
+    const grandTotal = totalR1 + totalR2 + totalR3 + totalR4;
+
+    let html = `
+      <div class="max-w-6xl mx-auto mt-6">
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div class="bg-purple-600 px-6 py-4 border-b border-purple-700 flex justify-between items-center">
+                <h3 class="text-white text-lg font-bold"><i class="fas fa-desktop mr-2"></i> รายละเอียดห้องสอบ</h3>
+                <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded">รวมทั้งหมด ${data.length} ห้อง</span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-xs text-gray-600 uppercase bg-gray-100 border-b border-gray-300">
+                        <tr>
+                            <th class="px-6 py-3 text-center w-24 border-r border-gray-300">ห้องสอบที่</th>
+                            <th class="px-6 py-3 text-center border-r border-gray-200">รอบที่ 1</th>
+                            <th class="px-6 py-3 text-center border-r border-gray-200">รอบที่ 2</th>
+                            <th class="px-6 py-3 text-center border-r border-gray-200">รอบที่ 3</th>
+                            <th class="px-6 py-3 text-center border-r border-gray-200">รอบที่ 4</th>
+                            <th class="px-6 py-3 text-center w-24 bg-gray-200 text-gray-800">รวม</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                        <tr class="bg-gray-800 text-white font-bold border-t-2 border-purple-500 text-base">
+                            <td class="px-6 py-4 text-center border-r border-gray-600">รวม</td>
+                            <td class="px-6 py-4 text-center border-r border-gray-600 text-yellow-300">${totalR1}</td>
+                            <td class="px-6 py-4 text-center border-r border-gray-600 text-yellow-300">${totalR2}</td>
+                            <td class="px-6 py-4 text-center border-r border-gray-600 text-yellow-300">${totalR3}</td>
+                            <td class="px-6 py-4 text-center border-r border-gray-600 text-yellow-300">${totalR4}</td>
+                            <td class="px-6 py-4 text-center bg-gray-700 text-xl">${grandTotal}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-right">
+             <button onclick="window.print()" class="text-gray-500 hover:text-gray-800 text-sm transition flex items-center justify-end w-full">
+                <i class="fas fa-print mr-1"></i> พิมพ์หน้านี้
+             </button>
+        </div>
+      </div>`;
+
+    div.innerHTML = html;
+  }
+
+  // --- RENDER TABLE (NORMAL) ---
+  function renderTable(menuItem, data) {
+    const div = document.getElementById('content-area');
+    if (!data || data.length === 0) { div.innerHTML = `<div class="text-center py-10 text-gray-400">ไม่พบข้อมูล</div>`; return; }
+    const config = COLUMN_CONFIG[menuItem.table] || Object.keys(data[0]).filter(k => k !== '_rowIndex').map(k => ({ key: k, label: k }));
+    let html = `<div class="p-4"><table id="dataTableID" class="stripe hover row-border order-column nowrap w-full text-sm" style="width:100%"><thead><tr>`;
+    config.forEach(col => html += `<th>${col.label}</th>`);
+    let allowEdit = (currentUser.role === 'admin' || (currentUser.role === 'school' && ['SchoolInfo','BudgetDetails'].includes(menuItem.table)));
+    if (currentUser.role === 'school' && (menuItem.table === 'SchoolInfo' || menuItem.table === 'FieldDetails' || menuItem.table === 'RoomDetails')) allowEdit = false;
+    if (allowEdit) html += `<th>จัดการ</th>`;
+    html += `</tr></thead><tbody>`;
+    data.forEach(row => {
+      html += `<tr>`;
+      config.forEach(col => {
+         let val = row[col.key] || '-';
+         if(String(val).startsWith('http')) val = `<a href="${val}" target="_blank" class="text-blue-500"><i class="fas fa-external-link-alt"></i></a>`;
+         if(col.key === 'status') val = (val === 'Active') ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Active</span>' : '<span class="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">Inactive</span>';
+         html += `<td>${val}</td>`;
+      });
+      if (allowEdit) {
+        const deleteBtn = (currentUser.role === 'admin') ? `<button onclick="deleteItem(${row._rowIndex})" class="text-red-500 hover:text-red-700 p-2 rounded-full transition transform hover:scale-110 ml-1"><i class="fas fa-trash"></i></button>` : '';
+        html += `<td class="text-center whitespace-nowrap"><button onclick="editItem(${row._rowIndex})" class="text-blue-600 hover:text-blue-800 p-2 rounded-full transition transform hover:scale-110"><i class="fas fa-edit"></i></button>${deleteBtn}</td>`;
+      }
+      html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    div.innerHTML = html;
+    setTimeout(() => {
+        if ($.fn.DataTable.isDataTable('#dataTableID')) $('#dataTableID').DataTable().destroy();
+        $('#dataTableID').DataTable({
+            responsive: false, scrollX: true, language: { url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/th.json" },
+            dom: '<"flex flex-col md:flex-row justify-between items-center mb-4 gap-4" <"flex items-center space-x-2"lB> f >rtip',
+            buttons: [ { extend: 'excelHtml5', text: '<i class="fas fa-file-excel mr-1"></i> Excel', className: 'dt-button' }, { extend: 'print', text: '<i class="fas fa-print mr-1"></i> พิมพ์ / PDF', className: 'dt-button', autoPrint: true, customize: function(win) { $(win.document.body).css('font-family', 'Sarabun'); } } ]
+        });
+    }, 50);
+  }
+
+  function renderCards(menuItem, data) {
+    const div = document.getElementById('card-area');
+    div.innerHTML = '';
+    if (!data || data.length === 0) { div.innerHTML = `<p class="col-span-3 text-center text-gray-400">ไม่พบข้อมูล</p>`; return; }
+    data.forEach(row => {
+      let cardHtml = '';
+      const adminControls = (currentUser.role === 'admin') ? `<div class="flex space-x-2"><button onclick="editItem(${row._rowIndex})" class="text-gray-400 hover:text-blue-600 transition"><i class="fas fa-edit"></i></button><button onclick="deleteItem(${row._rowIndex})" class="text-gray-400 hover:text-red-600 transition"><i class="fas fa-trash"></i></button></div>` : '';
+      if (menuItem.table === 'Setting') {
+         cardHtml = `<div class="admin-card bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition"><div class="flex justify-between items-start mb-3"><div class="flex items-center"><div class="p-2 bg-gray-100 rounded-lg text-gray-500 mr-3"><i class="fas fa-cog"></i></div><h3 class="font-bold text-gray-700 text-md">${row.setting_key}</h3></div>${adminControls}</div><p class="text-sm text-gray-500 mb-3 h-10 overflow-hidden line-clamp-2">${row.description || '-'}</p><div class="bg-gray-50 p-3 rounded-lg text-sm font-mono text-gray-700 break-all border border-gray-100">${row.setting_value}</div></div>`;
+      }
+      div.innerHTML += cardHtml;
+    });
+  }
+
+  // ==========================================
+  // 4. DYNAMIC CRUD (INSTANT MODE)
+  // ==========================================
+  function addItem() {
+    operationMode = 'add'; currentRowIndex = null;
+    document.getElementById('modal-title').innerText = 'เพิ่มข้อมูลใหม่';
+    document.getElementById('modal-icon').className = 'fas fa-plus text-blue-600';
+    renderModalForm({});
+    document.getElementById('edit-modal').classList.remove('hidden');
+  }
+
+  function editItem(rowIndex) {
+    operationMode = 'edit'; currentRowIndex = rowIndex;
+    const item = currentTableData.find(row => row._rowIndex === rowIndex);
+    if (!item) return;
+    document.getElementById('modal-title').innerText = 'แก้ไขข้อมูล';
+    document.getElementById('modal-icon').className = 'fas fa-edit text-blue-600';
+    renderModalForm(item);
+    document.getElementById('edit-modal').classList.remove('hidden');
+  }
+  
+  function renderModalForm(itemData) {
+    const formDiv = document.getElementById('modal-form-content');
+    formDiv.innerHTML = '';
+    const config = COLUMN_CONFIG[currentMenu.table] || (currentTableData.length > 0 ? Object.keys(currentTableData[0]).filter(k => k !== '_rowIndex').map(k => ({ key: k, label: k })) : []);
+    config.forEach(f => {
+      const val = itemData[f.key] || '';
+      const isReadonly = (operationMode === 'edit' && f.readonly);
+      const readonlyAttr = isReadonly ? 'disabled' : '';
+      const bgClass = isReadonly ? 'bg-gray-100 text-gray-500' : 'bg-white';
+      formDiv.innerHTML += `<div class="mb-3"><label class="block text-sm font-medium text-gray-700 mb-1">${f.label}</label>`;
+      if (currentMenu.table === 'Documents' && (f.key === 'category' || f.key === 'target_role')) {
+           const options = f.key === 'category' ? ['หนังสือราชการ', 'คำสั่ง', 'คู่มือ', 'เอกสารแนวทาง', 'อื่น ๆ'] : ['all', 'school', 'admin'];
+           let selectHtml = `<select id="input-${f.key}" ${readonlyAttr} class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition ${bgClass}">`;
+           selectHtml += `<option value="" disabled ${!val ? 'selected' : ''}>-- กรุณาเลือก --</option>`;
+           options.forEach(opt => { selectHtml += `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`; });
+           selectHtml += `</select>`; formDiv.innerHTML += selectHtml;
+      } 
+      else if (currentMenu.table === 'Users' && (f.key === 'role' || f.key === 'status')) {
+           let options = f.key === 'role' ? ['admin', 'school', 'supervisor'] : ['Active', 'Inactive'];
+           let selectHtml = `<select id="input-${f.key}" ${readonlyAttr} class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition ${bgClass}">`;
+           options.forEach(opt => { const isSelected = String(val) === String(opt) ? 'selected' : ''; selectHtml += `<option value="${opt}" ${isSelected}>${opt}</option>`; });
+           selectHtml += `</select>`; formDiv.innerHTML += selectHtml;
+      }
+      else {
+           formDiv.innerHTML += `<input type="text" id="input-${f.key}" value="${val}" ${readonlyAttr} class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition ${bgClass}">`;
+      }
+      formDiv.innerHTML += `</div>`;
+    });
+  }
+
+  function saveData() {
+    closeModal();
+    let formData = {};
+    const config = COLUMN_CONFIG[currentMenu.table] || (currentTableData.length > 0 ? Object.keys(currentTableData[0]).filter(k => k !== '_rowIndex').map(k => ({ key: k })) : []);
+    config.forEach(f => { const el = document.getElementById(`input-${f.key}`); if (el && (operationMode === 'add' || !el.disabled)) formData[f.key] = el.value; });
+
+    if (operationMode === 'edit') {
+        const index = currentTableData.findIndex(r => r._rowIndex === currentRowIndex);
+        if (index !== -1) Object.assign(currentTableData[index], formData);
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+        Toast.fire({ icon: 'success', title: 'บันทึกเรียบร้อย' });
+    } else {
+        toggleLoader(true); 
+    }
+
+    if (currentUser.role === 'school' && currentMenu.id === 'home') renderSchoolProfile(currentTableData[0]); 
+    else if (currentUser.role === 'school' && currentMenu.id === 'field') renderFieldDetails(currentTableData[0]);
+    else if (currentUser.role === 'school' && currentMenu.id === 'room') renderRoomDetails(currentTableData);
+    else if (currentMenu.viewType === 'table') renderTable(currentMenu, currentTableData);
+    else renderCards(currentMenu, currentTableData);
+
+    const backendFunc = (operationMode === 'add') ? google.script.run.apiAddData(currentMenu.table, formData) 
+                                                  : google.script.run.apiUpdateDataByRow(currentMenu.table, currentRowIndex, formData);
+
+    backendFunc.withSuccessHandler(res => {
+      if (operationMode === 'add') {
+          toggleLoader(false);
+          refreshData(); 
+          Swal.fire({ icon: 'success', title: 'เพิ่มข้อมูลสำเร็จ', timer: 1000, showConfirmButton: false });
+      }
+    }).withFailureHandler(err => {
+        Swal.fire('เกิดข้อผิดพลาด', 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
+        refreshData(); 
+    });
+  }
+
+  function deleteItem(rowIndex) {
+    Swal.fire({ title: 'ยืนยันการลบ?', text: "ลบแล้วกู้คืนไม่ได้นะ", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก' }).then((result) => {
+      if (result.isConfirmed) {
+        currentTableData = currentTableData.filter(r => r._rowIndex !== rowIndex);
+        if (currentMenu.viewType === 'table') renderTable(currentMenu, currentTableData);
+        else renderCards(currentMenu, currentTableData);
+        
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+        Toast.fire({ icon: 'success', title: 'ลบข้อมูลแล้ว' });
+
+        google.script.run.withSuccessHandler(res => {}).withFailureHandler(err => { Swal.fire('Error', 'ลบไม่สำเร็จ', 'error'); refreshData(); }).apiDeleteDataByRow(currentMenu.table, rowIndex);
+      }
+    });
+  }
+
+  // ==========================================
+  // 5. UTILS
+  // ==========================================
+  function closeModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+  function toggleLoader(show) { const el = document.getElementById('loader'); show ? el.classList.remove('hidden') : el.classList.add('hidden'); }
+  function refreshData() { if(currentMenu) loadContent(currentMenu, true); }
+</script>
